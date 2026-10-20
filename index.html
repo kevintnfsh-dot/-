@@ -26,8 +26,8 @@
 <script>const KEYS=['D','A','S'],$=s=>document.querySelector(s);
 const SHEET_ID='1aRtR0BMKm8Y0_JgHcAkQbwwfiZCKB8Brp9E7VJwtRCM',SHEET_TAB='年齡層統計';
 const LVN=['正常','輕度','中度','重度','極重度'],ALIAS={'重度':'嚴重','極重度':'極嚴重'};
-const RANGES={stats:'A1:J8',lv:'A10:P17'};
-const NOLVTXT='在「'+SHEET_TAB+'」的 '+RANGES.lv+' 找不到嚴重度人數表（標題需含「憂鬱_正常」…「壓力_極嚴重」），因此無法顯示嚴重度分布。';
+const RANGES={stats:'A1:J8',lv:{D:'A12:F19',A:'A23:F30',S:'A34:F41'}};
+const NOLVTXT='在「'+SHEET_TAB+'」找不到憂鬱、焦慮、壓力的等級人數表（預期位置：'+Object.values(RANGES.lv).join('、')+'；標題列需為「年齡層、正常、輕度、中度、重度、極重度」），因此無法顯示嚴重度分布。';
 const NOLV='<p style="margin:12px;color:var(--mut)">'+NOLVTXT+'</p>';
 const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 function parseCSV(t){const r=[];let row=[],c='',q=false;
@@ -53,8 +53,8 @@ async function loadData(){
   const H=t.H,col=(...a)=>{for(const n of a){const i=H.indexOf(n);if(i>=0)return i}return -1};
   const sc={D:'憂鬱',A:'焦慮',S:'壓力'},ix={},iL=col('年齡層'),iN=col('人數'),miss=[];
   if(iL<0)miss.push('年齡層');
-  for(const k in sc){ix[k]={m:col(sc[k]+'_平均'),s:col(sc[k]+'_標準差')};
-    if(ix[k].m<0)miss.push(sc[k]+'_平均');if(ix[k].s<0)miss.push(sc[k]+'_標準差')}
+  for(const k in sc){ix[k]={m:col(sc[k]+'平均',sc[k]+'_平均'),s:col(sc[k]+'標準差',sc[k]+'_標準差')};
+    if(ix[k].m<0)miss.push(sc[k]+'平均');if(ix[k].s<0)miss.push(sc[k]+'標準差')}
   if(miss.length)throw new Error('找不到欄位：'+miss.join('、')+'。目前的標題列是：'+H.join('、'));
   const groups=t.body.map(r=>{const n=num(r[iN]);if(n===null||!r[iL].trim())return null;
     const g={l:r[iL].trim(),n};
@@ -63,15 +63,17 @@ async function loadData(){
       g[k]={n,m,s,lv:null}}
     return g}).filter(Boolean);
   if(!groups.length)throw new Error('「'+SHEET_TAB+'」的 '+RANGES.stats+' 沒有資料列');
-  const lt=findTable(await getRows(RANGES.lv).catch(()=>[]),'憂鬱_正常');
-  if(lt){
-    const L=lt.H,li=L.indexOf('年齡層'),cols={};let ok=li>=0;
-    for(const k in sc){cols[k]=LVN.map(l=>{for(const n of [sc[k]+'_'+l,sc[k]+'_'+(ALIAS[l]||l)]){const i=L.indexOf(n);if(i>=0)return i}return -1});
-      if(cols[k].some(i=>i<0))ok=false}
-    if(ok){
-      const m=new Map(lt.body.map(r=>[r[li].trim(),r])),bad=groups.filter(g=>!m.has(g.l)).map(g=>g.l);
-      if(bad.length)throw new Error('嚴重度表（'+RANGES.lv+'）找不到年齡層：'+bad.join('、')+'。請確認 A11:A16 與 A2:A7 的年齡層相同');
-      for(const g of groups)for(const k in sc)g[k].lv=cols[k].map(i=>num(m.get(g.l)[i])||0)}}
+  let hasLv=true;const lvT={};
+  for(const k in sc){
+    const lt=findTable(await getRows(RANGES.lv[k]).catch(()=>[]),'正常');
+    if(!lt){hasLv=false;break}
+    const L=lt.H,li=L.indexOf('年齡層'),cj=LVN.map(l=>{for(const n of [l,ALIAS[l]||l]){const i=L.indexOf(n);if(i>=0)return i}return -1});
+    if(li<0||cj.some(i=>i<0)){hasLv=false;break}
+    lvT[k]={m:new Map(lt.body.map(r=>[r[li].trim(),r])),cj}}
+  if(hasLv){
+    const bad=groups.filter(g=>Object.keys(sc).some(k=>!lvT[k].m.has(g.l))).map(g=>g.l);
+    if(bad.length)throw new Error('等級人數表找不到年齡層：'+bad.join('、')+'。請確認三張等級人數表的年齡層名稱與最上方統計表相同');
+    for(const g of groups)for(const k in sc)g[k].lv=lvT[k].cj.map(i=>num(lvT[k].m.get(g.l)[i])||0)}
   return groups}
 function total(gs){const N=gs.reduce((a,g)=>a+g.n,0),T={n:N};
   for(const k of ['D','A','S']){const M=gs.reduce((a,g)=>a+g.n*g[k].m,0)/N;
