@@ -15,6 +15,10 @@
 <button id="ping" type="button" style="font:inherit;padding:8px 16px;border:1px solid var(--line);border-radius:8px;background:var(--ink);color:var(--card);cursor:pointer">測試連線</button>
 <pre id="out" aria-live="polite" style="margin:12px 0 0;white-space:pre-wrap;word-break:break-word;font:inherit;font-size:14px;color:var(--mut)"></pre>
 </div>
+<div style="margin-top:20px">
+<button id="gem" type="button" style="font:inherit;padding:8px 16px;border:1px solid var(--line);border-radius:8px;background:var(--ink);color:var(--card);cursor:pointer">測試 Gemini</button>
+<pre id="gout" aria-live="polite" style="margin:12px 0 0;white-space:pre-wrap;word-break:break-word;font:inherit;font-size:14px;color:var(--mut)"></pre>
+</div>
 </div></main>
 <footer><div class="in"><span>組別：第 ＿ 組（請填入組別）</span><span>組員：（請填入組員姓名）</span></div></footer>
 <script>
@@ -32,6 +36,22 @@ btn.addEventListener('click',async()=>{
   }catch(e){
     out.textContent='連線失敗：'+e.message+'\n請確認後端網址是否正確、Worker 是否已部署，以及網路是否正常。';
   }finally{btn.disabled=false}
+});
+
+// 測試 Gemini：送出固定問題，顯示回覆文字
+const gem=document.getElementById('gem'),gout=document.getElementById('gout');
+gem.addEventListener('click',async()=>{
+  if(!/^https?:\/\//.test(BACKEND_URL)){gout.textContent='尚未設定後端網址：請把 ask.html 裡的 BACKEND_URL 改成你的 Worker 網址。';return}
+  gem.disabled=true;gout.textContent='等待 Gemini 回覆中…';
+  try{
+    const res=await fetch(BACKEND_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'ask',question:'請用一句話自我介紹'})});
+    const text=await res.text();
+    let data=null;try{data=JSON.parse(text)}catch(e){}
+    if(res.ok&&data&&typeof data.answer==='string'){gout.textContent=data.answer}
+    else{gout.textContent='失敗（HTTP '+res.status+'）：'+((data&&data.error)||text||'後端沒有回傳內容')}
+  }catch(e){
+    gout.textContent='連線失敗：'+e.message+'\n請確認後端網址是否正確、Worker 是否已部署，以及網路是否正常。';
+  }finally{gem.disabled=false}
 });
 </script>
 </body>
