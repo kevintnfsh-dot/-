@@ -11,8 +11,28 @@
 <main><div class="in">
 <h1 style="margin-top:32px">問答</h1>
 <div class="soon"><b>即將推出</b><p>問答功能正在準備中，目前請先到<a href="results.html">研究結果</a>查看圖表與數據。</p></div>
+<div style="margin-top:20px">
+<button id="ping" type="button" style="font:inherit;padding:8px 16px;border:1px solid var(--line);border-radius:8px;background:var(--ink);color:var(--card);cursor:pointer">測試連線</button>
+<pre id="out" aria-live="polite" style="margin:12px 0 0;white-space:pre-wrap;word-break:break-word;font:inherit;font-size:14px;color:var(--mut)"></pre>
+</div>
 </div></main>
 <footer><div class="in"><span>組別：第 ＿ 組（請填入組別）</span><span>組員：（請填入組員姓名）</span></div></footer>
-
+<script>
+// 後端（Cloudflare Worker）網址
+const BACKEND_URL='https://dass-43.kevintnfsh.workers.dev/';
+const btn=document.getElementById('ping'),out=document.getElementById('out');
+btn.addEventListener('click',async()=>{
+  if(!/^https?:\/\//.test(BACKEND_URL)){out.textContent='尚未設定後端網址：請把 ask.html 裡的 BACKEND_URL 改成你的 Worker 網址。';return}
+  btn.disabled=true;out.textContent='連線中…';
+  try{
+    const res=await fetch(BACKEND_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'test'})});
+    const text=await res.text();
+    let shown=text;try{shown=JSON.stringify(JSON.parse(text),null,2)}catch(e){}
+    out.textContent=(res.ok?'連線成功':'後端回傳錯誤')+'（HTTP '+res.status+'）\n'+shown;
+  }catch(e){
+    out.textContent='連線失敗：'+e.message+'\n請確認後端網址是否正確、Worker 是否已部署，以及網路是否正常。';
+  }finally{btn.disabled=false}
+});
+</script>
 </body>
 </html>
